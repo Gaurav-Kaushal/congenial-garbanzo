@@ -2,21 +2,81 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hello-api
+  namespace: hello-api
+  labels:
+    app: hello-api
+    version: "1.0"
 spec:
-  replicas: 3
+  replicas: 3                        
   selector:
     matchLabels:
       app: hello-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0               
+      maxSurge: 1                     
   template:
     metadata:
       labels:
         app: hello-api
+        version: "1.0"
     spec:
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+
       containers:
         - name: hello-api
           image: myregistry/hello-api:latest
+          imagePullPolicy: Always
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
           env:
             - name: PORT
               value: "8080"
+
+
+          resources:
+            requests:
+              cpu: "100m"             
+              memory: "64Mi"          
+            limits:
+              cpu: "200m"             
+              memory: "128Mi"         
+
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 2
+
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: hello-api
