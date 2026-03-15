@@ -17,3 +17,6 @@ README.md
 
 .env
 .env.*
+
+terraform/modules/
+terraform/environments/
