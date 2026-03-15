@@ -2,12 +2,43 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: hello-api
+  namespace: argocd
+  labels:
+    app: hello-api
+    env: production
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
+
   source:
-    repoURL: https://github.com/djames8/congenial-garbanzo.git
+    repoURL: https://github.com/Gaurav-Kaushal/congenial-garbanzo.git
     targetRevision: main
     path: k8s
+
   destination:
     server: https://kubernetes.default.svc
-    namespace: default
+    namespace: hello-api
+
+  syncPolicy:
+    automated:
+      prune: true        #remove resources deleted from Git
+      selfHeal: true     #revert manual kubectl changes
+      allowEmpty: false  #safety net
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - ApplyOutOfSyncOnly=true  #only apply changed resources faster syncs
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  #ignore HPA-managed replica count to avoid constant OutOfSync
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
